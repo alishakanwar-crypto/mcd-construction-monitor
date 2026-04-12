@@ -1,0 +1,18 @@
+[project]
+name = "mcd-construction-monitor"
+version = "1.0.0"
+description = "MCD Unauthorized Construction Monitoring System"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi[standard]>=0.115.0",
+    "fastapi-cli>=0.0.7",
+    "uvicorn[standard]",
+    "sqlalchemy>=2.0",
+    "python-jose[cryptography]",
+    "passlib[bcrypt]",
+    "bcrypt==4.0.1",
+    "python-multipart",
+    "aiofiles",
+    "Pillow",
+    "pydantic>=2",
+]
