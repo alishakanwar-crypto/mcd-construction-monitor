@@ -13,6 +13,5 @@ dependencies = [
     "bcrypt==4.0.1",
     "python-multipart",
     "aiofiles",
-    "Pillow",
     "pydantic>=2",
 ]
