@@ -28,6 +28,10 @@ export default function DataEntry() {
   const [autoFillStatus, setAutoFillStatus] = useState('');
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
 
   const [form, setForm] = useState({
     property_address: '',
@@ -176,6 +180,96 @@ export default function DataEntry() {
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
+  const openCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false
+      });
+      setCameraStream(stream);
+      setShowCamera(true);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+      }, 100);
+    } catch (err) {
+      // Fallback: trigger file input with capture
+      if (cameraInputRef.current) {
+        cameraInputRef.current.click();
+      }
+    }
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      const file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      closeCamera();
+      // Process like a normal image upload
+      const reader = new FileReader();
+      reader.onload = (ev) => setImagePreview(ev.target.result);
+      reader.readAsDataURL(file);
+      setImageFile(file);
+      setExtracting(true);
+      setAutoFillStatus('Photo captured! Getting location...');
+      setError('');
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        let extractedData = null;
+        try {
+          extractedData = await api.extractImageData(formData);
+        } catch (err) {
+          console.log('Image extraction not available:', err.message);
+        }
+        // Use device GPS since camera captures won't have EXIF GPS
+        if (location.lat && location.lng) {
+          setLocation({ lat: location.lat, lng: location.lng });
+          try {
+            const geoData = await api.geocodeCoordinates(location.lat, location.lng);
+            const updates = {};
+            if (geoData.address) updates.property_address = geoData.address;
+            if (geoData.zone) updates.zone = geoData.zone;
+            updates.visit_date = new Date().toISOString().slice(0, 16);
+            if (Object.keys(updates).length > 0) {
+              setForm(prev => ({ ...prev, ...updates }));
+              const filled = [];
+              if (updates.property_address) filled.push('address');
+              if (updates.zone) filled.push('zone');
+              filled.push('date/time', 'GPS');
+              setAutoFillStatus(`Auto-filled: ${filled.join(', ')}`);
+            }
+          } catch {
+            setAutoFillStatus('Photo captured. Fill address manually.');
+          }
+        } else {
+          setAutoFillStatus('Photo captured. Enable location for auto-fill.');
+        }
+      } catch {
+        setAutoFillStatus('Photo captured. Fill fields manually.');
+      } finally {
+        setExtracting(false);
+      }
+    }, 'image/jpeg', 0.9);
+  };
+
+  const closeCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setShowCamera(false);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -256,21 +350,26 @@ export default function DataEntry() {
           {!imagePreview ? (
             <div className="flex flex-col sm:flex-row gap-3">
               {/* Camera Capture Button */}
-              <label className="flex-1 flex flex-col items-center justify-center h-36 border-2 border-dashed border-green-300 rounded-xl cursor-pointer bg-white hover:bg-green-50 transition-colors">
+              <button
+                type="button"
+                onClick={openCamera}
+                className="flex-1 flex flex-col items-center justify-center h-36 border-2 border-dashed border-green-300 rounded-xl cursor-pointer bg-white hover:bg-green-50 transition-colors"
+              >
                 <div className="flex flex-col items-center gap-2">
                   <Camera size={36} className="text-green-500" />
                   <span className="text-sm font-semibold text-green-700">Take Photo</span>
                   <span className="text-xs text-gray-400">Open camera to capture</span>
                 </div>
-                <input
-                  ref={cameraInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-              </label>
+              </button>
+              {/* Hidden file input for camera fallback */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
 
               {/* Gallery Upload Button */}
               <label className="flex-1 flex flex-col items-center justify-center h-36 border-2 border-dashed border-blue-300 rounded-xl cursor-pointer bg-white hover:bg-blue-50 transition-colors">
@@ -530,6 +629,41 @@ export default function DataEntry() {
           </div>
         </div>
       )}
+
+      {/* Camera Modal */}
+      {showCamera && (
+        <div className="fixed inset-0 bg-black z-50 flex flex-col">
+          <div className="flex items-center justify-between p-4 bg-black/80">
+            <h3 className="text-white font-semibold text-lg">Take Photo</h3>
+            <button
+              type="button"
+              onClick={closeCamera}
+              className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center bg-black">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="max-w-full max-h-full object-contain"
+            />
+          </div>
+          <div className="p-6 bg-black/80 flex justify-center">
+            <button
+              type="button"
+              onClick={capturePhoto}
+              className="w-20 h-20 rounded-full border-4 border-white bg-white/20 hover:bg-white/40 transition-colors flex items-center justify-center"
+            >
+              <div className="w-14 h-14 rounded-full bg-white" />
+            </button>
+          </div>
+        </div>
+      )}
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 }
