@@ -76,6 +76,14 @@ export const api = {
     return request(`/media/latest?${qs}`);
   },
 
+  quickCapture: (formData) =>
+    request('/media/quick-capture', { method: 'POST', body: formData }),
+
+  getMcdZones: () => request('/media/zones'),
+
+  updateReport: (id, data) =>
+    request(`/reports/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
   deleteMedia: (id) => request(`/media/${id}`, { method: 'DELETE' }),
 
   deleteReport: (id) => request(`/reports/${id}`, { method: 'DELETE' }),

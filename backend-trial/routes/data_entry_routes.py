@@ -106,6 +106,49 @@ def get_report(report_id: int, db: Session = Depends(get_db), current_user: User
     )
 
 
+@router.put("/{report_id}")
+def update_report(
+    report_id: int,
+    report_data: ReportCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    report = db.query(Report).filter(Report.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    # Allow the engineer who created it or admin to edit
+    if current_user.role != "admin" and report.engineer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    report.property_address = report_data.property_address
+    report.zone = report_data.zone or report.zone
+    report.ward = report_data.ward
+    report.visit_date = report_data.visit_date
+    report.activity_type = report_data.activity_type
+    report.activity_description = report_data.activity_description
+    report.owner_name = report_data.owner_name
+    report.owner_contact = report_data.owner_contact
+    report.ownership_type = report_data.ownership_type
+    report.last_sanctioned_plan = report_data.last_sanctioned_plan
+    report.sanctioned_plan_date = report_data.sanctioned_plan_date
+    report.latitude = report_data.latitude
+    report.longitude = report_data.longitude
+    report.remarks = report_data.remarks
+    report.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(report)
+
+    engineer = db.query(User).filter(User.id == report.engineer_id).first()
+    media_count = db.query(func.count(Media.id)).filter(Media.report_id == report.id).scalar()
+    return ReportResponse(
+        **{c.name: getattr(report, c.name) for c in report.__table__.columns},
+        engineer_name=engineer.full_name if engineer else None,
+        engineer_role=engineer.role if engineer else None,
+        media_count=media_count
+    )
+
+
 @router.put("/{report_id}/status")
 def update_report_status(
     report_id: int,
