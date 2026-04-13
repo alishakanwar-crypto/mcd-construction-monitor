@@ -9,7 +9,7 @@ from typing import Optional
 import os
 import uuid
 
-UPLOAD_DIR = "/data/uploads" if os.path.isdir("/data") else os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+UPLOAD_DIR = "/data/uploads_trial" if os.path.isdir("/data") else os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads_trial")
 
 router = APIRouter(prefix="/api/media", tags=["Image & Video Capture"])
 
