@@ -80,6 +80,12 @@ export const api = {
 
   deleteReport: (id) => request(`/reports/${id}`, { method: 'DELETE' }),
 
+  extractImageData: (formData) =>
+    request('/image-extract/', { method: 'POST', body: formData }),
+
+  geocodeCoordinates: (lat, lng) =>
+    request(`/image-extract/geocode?latitude=${lat}&longitude=${lng}`, { method: 'POST' }),
+
   getDailySummary: (date) => {
     const qs = date ? `?date=${date}` : '';
     return request(`/reports-summary/daily${qs}`);

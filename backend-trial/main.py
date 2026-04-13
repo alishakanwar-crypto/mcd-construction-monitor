@@ -9,6 +9,7 @@ from routes.data_entry_routes import router as data_entry_router
 from routes.media_routes import router as media_router
 from routes.report_routes import router as report_router
 from routes.control_panel_routes import router as control_panel_router
+from routes.image_extract_routes import router as image_extract_router
 import os
 
 Base.metadata.create_all(bind=engine)
@@ -40,6 +41,7 @@ app.include_router(data_entry_router)
 app.include_router(media_router)
 app.include_router(report_router)
 app.include_router(control_panel_router)
+app.include_router(image_extract_router)
 
 
 @app.on_event("startup")
