@@ -128,8 +128,9 @@ async def quick_capture(
     parsed_time = None
     if capture_time:
         try:
-            parsed_time = datetime.fromisoformat(capture_time)
-        except ValueError:
+            ct = capture_time.replace("Z", "+00:00")
+            parsed_time = datetime.fromisoformat(ct).replace(tzinfo=None)
+        except (ValueError, AttributeError):
             parsed_time = datetime.utcnow()
 
     lat = latitude
@@ -258,8 +259,9 @@ async def upload_media(
     parsed_time = None
     if capture_time:
         try:
-            parsed_time = datetime.fromisoformat(capture_time)
-        except ValueError:
+            ct = capture_time.replace("Z", "+00:00")
+            parsed_time = datetime.fromisoformat(ct).replace(tzinfo=None)
+        except (ValueError, AttributeError):
             parsed_time = datetime.utcnow()
 
     # Store file data in database for persistence across deploys
