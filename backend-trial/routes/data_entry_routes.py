@@ -139,14 +139,9 @@ def delete_report(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
-    # Delete associated media files and records
-    import os
+    # Delete associated media records (data stored in DB, no filesystem cleanup needed)
     media_list = db.query(Media).filter(Media.report_id == report_id).all()
-    DATA_DIR = "/data" if os.path.isdir("/data") else os.path.dirname(os.path.dirname(__file__))
     for media in media_list:
-        full_path = os.path.join(DATA_DIR, media.file_path.lstrip("/"))
-        if os.path.exists(full_path):
-            os.remove(full_path)
         db.delete(media)
 
     db.delete(report)

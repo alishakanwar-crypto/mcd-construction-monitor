@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from database import engine, Base, SessionLocal
 from models import User
 from auth import get_password_hash
@@ -28,12 +27,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount uploads directory - trial uses separate upload folder
-DATA_DIR = "/data" if os.path.isdir("/data") else os.path.dirname(__file__)
-upload_dir = os.path.join(DATA_DIR, "uploads_trial")
-os.makedirs(os.path.join(upload_dir, "images"), exist_ok=True)
-os.makedirs(os.path.join(upload_dir, "videos"), exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=upload_dir), name="uploads")
+# Media files are now served from PostgreSQL database via /api/media/file/{filename}
+# No filesystem mount needed - this ensures data persists across deploys
 
 # Include routers
 app.include_router(auth_router)

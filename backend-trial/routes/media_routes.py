@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User, Report, Media
@@ -8,8 +9,6 @@ from datetime import datetime
 from typing import Optional
 import os
 import uuid
-
-UPLOAD_DIR = "/data/uploads_trial" if os.path.isdir("/data") else os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads_trial")
 
 router = APIRouter(prefix="/api/media", tags=["Image & Video Capture"])
 
@@ -40,13 +39,8 @@ async def upload_media(
 
     ext = os.path.splitext(file.filename)[1] if file.filename else ".jpg"
     unique_name = f"{uuid.uuid4().hex}{ext}"
-    save_dir = os.path.join(UPLOAD_DIR, sub_dir)
-    os.makedirs(save_dir, exist_ok=True)
-    file_path = os.path.join(save_dir, unique_name)
 
     contents = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(contents)
 
     parsed_time = None
     if capture_time:
@@ -55,21 +49,37 @@ async def upload_media(
         except ValueError:
             parsed_time = datetime.utcnow()
 
+    # Store file data in database for persistence across deploys
     media = Media(
         report_id=report_id,
         engineer_id=current_user.id,
         media_type=media_type,
-        file_path=f"/uploads/{sub_dir}/{unique_name}",
+        file_path=f"/api/media/file/{unique_name}",
         file_name=file.filename or unique_name,
         latitude=latitude,
         longitude=longitude,
         capture_time=parsed_time or datetime.utcnow(),
-        file_size=len(contents)
+        file_size=len(contents),
+        file_data=contents,
+        content_type=content_type,
     )
     db.add(media)
     db.commit()
     db.refresh(media)
     return MediaResponse.model_validate(media)
+
+
+@router.get("/file/{filename}")
+def serve_media_file(filename: str, db: Session = Depends(get_db)):
+    """Serve media files from database storage."""
+    media = db.query(Media).filter(Media.file_path.contains(filename)).first()
+    if not media or not media.file_data:
+        raise HTTPException(status_code=404, detail="File not found")
+    return Response(
+        content=media.file_data,
+        media_type=media.content_type or "application/octet-stream",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @router.get("/report/{report_id}", response_model=list[MediaResponse])
@@ -100,10 +110,6 @@ def delete_media(media_id: int, db: Session = Depends(get_db), current_user: Use
 
     if current_user.role not in ["admin", "executive_engineer"] and media.engineer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Permission denied")
-
-    full_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), media.file_path.lstrip("/"))
-    if os.path.exists(full_path):
-        os.remove(full_path)
 
     db.delete(media)
     db.commit()

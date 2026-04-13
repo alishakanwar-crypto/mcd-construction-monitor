@@ -3,12 +3,19 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 
-# Use /data for persistent storage, fallback to local for dev
-# Trial version uses separate database
-DATA_DIR = "/data" if os.path.isdir("/data") else "."
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATA_DIR}/mcd_monitor_trial.db")
+# Use PostgreSQL for persistent storage (survives redeploys)
+# Falls back to SQLite for local development only
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///mcd_monitor_trial.db")
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# Fix Render's postgres:// prefix (SQLAlchemy requires postgresql://)
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+connect_args = {}
+if DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
+
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

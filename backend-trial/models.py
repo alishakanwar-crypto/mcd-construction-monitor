@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, Enum as SAEnum
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, Enum as SAEnum, LargeBinary
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
@@ -78,6 +78,8 @@ class Media(Base):
     longitude = Column(Float, nullable=True)
     capture_time = Column(DateTime, nullable=True)
     file_size = Column(Integer, nullable=True)
+    file_data = Column(LargeBinary, nullable=True)  # Store image binary in DB for persistence
+    content_type = Column(String(100), nullable=True)  # MIME type for serving
     created_at = Column(DateTime, default=datetime.utcnow)
 
     report = relationship("Report", back_populates="media")
