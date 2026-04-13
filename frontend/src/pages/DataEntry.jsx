@@ -27,6 +27,7 @@ export default function DataEntry() {
   const [extracting, setExtracting] = useState(false);
   const [autoFillStatus, setAutoFillStatus] = useState('');
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   const [form, setForm] = useState({
     property_address: '',
@@ -172,6 +173,7 @@ export default function DataEntry() {
     setImageFile(null);
     setAutoFillStatus('');
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
   const handleSubmit = async (e) => {
@@ -252,21 +254,40 @@ export default function DataEntry() {
           <p className="text-xs text-gray-500 mb-3">Upload a photo taken at the site. GPS location and timestamp will be extracted automatically to fill the form.</p>
 
           {!imagePreview ? (
-            <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-blue-300 rounded-xl cursor-pointer bg-white hover:bg-blue-50 transition-colors">
-              <div className="flex flex-col items-center gap-2">
-                <Upload size={32} className="text-blue-400" />
-                <span className="text-sm font-medium text-blue-600">Click to upload site image</span>
-                <span className="text-xs text-gray-400">or take a photo with camera</span>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-            </label>
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Camera Capture Button */}
+              <label className="flex-1 flex flex-col items-center justify-center h-36 border-2 border-dashed border-green-300 rounded-xl cursor-pointer bg-white hover:bg-green-50 transition-colors">
+                <div className="flex flex-col items-center gap-2">
+                  <Camera size={36} className="text-green-500" />
+                  <span className="text-sm font-semibold text-green-700">Take Photo</span>
+                  <span className="text-xs text-gray-400">Open camera to capture</span>
+                </div>
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+              </label>
+
+              {/* Gallery Upload Button */}
+              <label className="flex-1 flex flex-col items-center justify-center h-36 border-2 border-dashed border-blue-300 rounded-xl cursor-pointer bg-white hover:bg-blue-50 transition-colors">
+                <div className="flex flex-col items-center gap-2">
+                  <Upload size={36} className="text-blue-500" />
+                  <span className="text-sm font-semibold text-blue-700">Upload from Gallery</span>
+                  <span className="text-xs text-gray-400">Choose existing image</span>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
           ) : (
             <div className="relative">
               <div className="flex gap-4 items-start">
