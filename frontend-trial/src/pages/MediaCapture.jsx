@@ -10,12 +10,9 @@ export default function MediaCapture() {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [location, setLocation] = useState({ lat: null, lng: null });
-  const [captureMode, setCaptureMode] = useState(null); // 'camera', 'video', 'upload'
-  const [stream, setStream] = useState(null);
-  const [capturedImage, setCapturedImage] = useState(null);
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+  const videoInputRef = useRef(null);
 
   useEffect(() => {
     loadReports();
@@ -25,7 +22,6 @@ export default function MediaCapture() {
         () => {}
       );
     }
-    return () => { if (stream) stream.getTracks().forEach(t => t.stop()); };
   }, []);
 
   useEffect(() => {
@@ -44,74 +40,6 @@ export default function MediaCapture() {
       const data = await api.getReportMedia(reportId);
       setReportMedia(data);
     } catch {}
-  };
-
-  const startCamera = async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
-      });
-      setStream(mediaStream);
-      setCaptureMode('camera');
-      setTimeout(() => {
-        if (videoRef.current) videoRef.current.srcObject = mediaStream;
-      }, 100);
-    } catch (err) {
-      setError('Camera access denied. Please allow camera access.');
-    }
-  };
-
-  const capturePhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    setCapturedImage(dataUrl);
-    stopCamera();
-  };
-
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      setStream(null);
-    }
-    setCaptureMode(null);
-  };
-
-  const dataURLtoFile = (dataUrl, filename) => {
-    const arr = dataUrl.split(',');
-    const mime = arr[0].match(/:(.*?);/)[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) u8arr[n] = bstr.charCodeAt(n);
-    return new File([u8arr], filename, { type: mime });
-  };
-
-  const uploadCapturedImage = async () => {
-    if (!selectedReport || !capturedImage) return;
-    setUploading(true);
-    setError('');
-    setSuccess('');
-    try {
-      const file = dataURLtoFile(capturedImage, `capture_${Date.now()}.jpg`);
-      const formData = new FormData();
-      formData.append('file', file);
-      if (location.lat) formData.append('latitude', location.lat);
-      if (location.lng) formData.append('longitude', location.lng);
-      formData.append('capture_time', new Date().toISOString());
-      await api.uploadMedia(selectedReport, formData);
-      setSuccess('Image uploaded successfully!');
-      setCapturedImage(null);
-      loadReportMedia(selectedReport);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUploading(false);
-    }
   };
 
   const handleFileUpload = async (e) => {
@@ -141,7 +69,10 @@ export default function MediaCapture() {
       loadReportMedia(selectedReport);
     }
     setUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    // Reset file inputs
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
+    if (videoInputRef.current) videoInputRef.current.value = '';
   };
 
   const handleDeleteMedia = async (mediaId) => {
@@ -200,25 +131,40 @@ export default function MediaCapture() {
 
       {selectedReport && (
         <>
-          {/* Capture Methods */}
+          {/* Capture Methods - Large mobile-friendly buttons */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
             <h3 className="font-semibold text-gray-700 mb-4">Step 2: Capture / Upload Media</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <button
-                onClick={startCamera}
-                className="flex flex-col items-center gap-2 p-6 border-2 border-dashed border-blue-300 rounded-xl hover:bg-blue-50 transition-colors"
-              >
-                <Camera size={32} className="text-blue-500" />
-                <span className="text-sm font-medium text-gray-700">Take Photo</span>
-                <span className="text-xs text-gray-400">Use device camera</span>
-              </button>
-
-              <label className="flex flex-col items-center gap-2 p-6 border-2 border-dashed border-green-300 rounded-xl hover:bg-green-50 transition-colors cursor-pointer">
-                <Upload size={32} className="text-green-500" />
-                <span className="text-sm font-medium text-gray-700">Upload Files</span>
-                <span className="text-xs text-gray-400">Images & Videos</span>
+            <div className="space-y-4">
+              {/* TAKE PHOTO - Opens native phone camera */}
+              <label className="flex items-center gap-4 p-5 bg-blue-50 border-2 border-blue-400 rounded-xl cursor-pointer active:bg-blue-100">
+                <div className="bg-blue-500 text-white rounded-full p-4 flex-shrink-0">
+                  <Camera size={28} />
+                </div>
+                <div className="flex-1">
+                  <span className="text-lg font-bold text-blue-700 block">📷 Take Photo</span>
+                  <span className="text-sm text-blue-500">Opens your phone camera</span>
+                </div>
                 <input
-                  ref={fileInputRef}
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+
+              {/* UPLOAD FROM GALLERY */}
+              <label className="flex items-center gap-4 p-5 bg-green-50 border-2 border-green-400 rounded-xl cursor-pointer active:bg-green-100">
+                <div className="bg-green-500 text-white rounded-full p-4 flex-shrink-0">
+                  <Upload size={28} />
+                </div>
+                <div className="flex-1">
+                  <span className="text-lg font-bold text-green-700 block">📁 Upload from Gallery</span>
+                  <span className="text-sm text-green-500">Choose images or videos</span>
+                </div>
+                <input
+                  ref={galleryInputRef}
                   type="file"
                   accept="image/*,video/*"
                   multiple
@@ -227,12 +173,17 @@ export default function MediaCapture() {
                 />
               </label>
 
-              <label className="flex flex-col items-center gap-2 p-6 border-2 border-dashed border-purple-300 rounded-xl hover:bg-purple-50 transition-colors cursor-pointer">
-                <Video size={32} className="text-purple-500" />
-                <span className="text-sm font-medium text-gray-700">Record Video</span>
-                <span className="text-xs text-gray-400">From gallery</span>
+              {/* RECORD VIDEO */}
+              <label className="flex items-center gap-4 p-5 bg-purple-50 border-2 border-purple-400 rounded-xl cursor-pointer active:bg-purple-100">
+                <div className="bg-purple-500 text-white rounded-full p-4 flex-shrink-0">
+                  <Video size={28} />
+                </div>
+                <div className="flex-1">
+                  <span className="text-lg font-bold text-purple-700 block">🎥 Record Video</span>
+                  <span className="text-sm text-purple-500">Opens your phone camera for video</span>
+                </div>
                 <input
-                  ref={fileInputRef}
+                  ref={videoInputRef}
                   type="file"
                   accept="video/*"
                   capture="environment"
@@ -249,42 +200,6 @@ export default function MediaCapture() {
               </div>
             )}
           </div>
-
-          {/* Camera Preview */}
-          {captureMode === 'camera' && (
-            <div className="bg-black rounded-xl overflow-hidden mb-6">
-              <video ref={videoRef} autoPlay playsInline className="w-full" />
-              <canvas ref={canvasRef} className="hidden" />
-              <div className="flex items-center justify-center gap-4 p-4 bg-gray-900">
-                <button onClick={capturePhoto}
-                  className="bg-white text-gray-900 px-6 py-2 rounded-full font-medium hover:bg-gray-200">
-                  📸 Capture
-                </button>
-                <button onClick={stopCamera}
-                  className="bg-red-500 text-white px-6 py-2 rounded-full font-medium hover:bg-red-600">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Captured Image Preview */}
-          {capturedImage && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-              <h3 className="font-semibold text-gray-700 mb-3">Captured Image Preview</h3>
-              <img src={capturedImage} alt="Captured" className="w-full max-h-96 object-contain rounded-lg mb-4" />
-              <div className="flex gap-3">
-                <button onClick={uploadCapturedImage} disabled={uploading}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50">
-                  {uploading ? 'Uploading...' : 'Upload Image'}
-                </button>
-                <button onClick={() => setCapturedImage(null)}
-                  className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-300">
-                  Discard
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Media Gallery */}
           {reportMedia.length > 0 && (
