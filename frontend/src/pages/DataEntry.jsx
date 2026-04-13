@@ -48,10 +48,44 @@ export default function DataEntry() {
     remarks: '',
   });
 
+  // Auto-fill from device GPS on page load
+  const autoFillFromGPS = async (lat, lng) => {
+    try {
+      const geoData = await api.geocodeCoordinates(lat, lng);
+      const updates = {};
+      if (geoData.address) updates.property_address = geoData.address;
+      if (geoData.zone) updates.zone = geoData.zone;
+      if (geoData.ward) updates.ward = geoData.ward;
+      updates.visit_date = new Date().toISOString().slice(0, 16);
+      if (Object.keys(updates).length > 0) {
+        setForm(prev => ({
+          ...prev,
+          ...updates,
+          // Keep user's zone if already set (e.g. from user profile)
+          zone: prev.zone || updates.zone || '',
+        }));
+        const filled = [];
+        if (updates.property_address) filled.push('address');
+        if (updates.zone) filled.push('zone');
+        if (updates.ward) filled.push('ward');
+        filled.push('date/time');
+        setAutoFillStatus(`Auto-filled from GPS: ${filled.join(', ')}. All fields are editable.`);
+      }
+    } catch {
+      // Silently fail - user can fill manually
+    }
+  };
+
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setLocation({ lat, lng });
+          // Auto-fill address, zone, ward from GPS immediately
+          autoFillFromGPS(lat, lng);
+        },
         () => {}
       );
     }
@@ -239,14 +273,16 @@ export default function DataEntry() {
             const updates = {};
             if (geoData.address) updates.property_address = geoData.address;
             if (geoData.zone) updates.zone = geoData.zone;
+            if (geoData.ward) updates.ward = geoData.ward;
             updates.visit_date = new Date().toISOString().slice(0, 16);
             if (Object.keys(updates).length > 0) {
               setForm(prev => ({ ...prev, ...updates }));
               const filled = [];
               if (updates.property_address) filled.push('address');
               if (updates.zone) filled.push('zone');
+              if (updates.ward) filled.push('ward');
               filled.push('date/time', 'GPS');
-              setAutoFillStatus(`Auto-filled: ${filled.join(', ')}`);
+              setAutoFillStatus(`Auto-filled: ${filled.join(', ')}. All fields are editable.`);
             }
           } catch {
             setAutoFillStatus('Photo captured. Fill address manually.');
@@ -630,36 +666,42 @@ export default function DataEntry() {
         </div>
       )}
 
-      {/* Camera Modal */}
+      {/* Camera Modal - Full Screen */}
       {showCamera && (
         <div className="fixed inset-0 bg-black z-50 flex flex-col">
-          <div className="flex items-center justify-between p-4 bg-black/80">
-            <h3 className="text-white font-semibold text-lg">Take Photo</h3>
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-4 py-3 bg-black/90">
+            <h3 className="text-white font-bold text-xl">Camera</h3>
             <button
               type="button"
               onClick={closeCamera}
-              className="text-white bg-red-500 rounded-full p-2 hover:bg-red-600"
+              className="text-white bg-red-600 rounded-lg px-4 py-2 font-semibold hover:bg-red-700 text-sm"
             >
-              <X size={20} />
+              Cancel
             </button>
           </div>
-          <div className="flex-1 flex items-center justify-center bg-black">
+
+          {/* Video Feed */}
+          <div className="flex-1 flex items-center justify-center bg-black relative">
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="max-w-full max-h-full object-contain"
+              className="w-full h-full object-cover"
             />
           </div>
-          <div className="p-6 bg-black/80 flex justify-center">
+
+          {/* Big Capture Button - Very Prominent */}
+          <div className="py-8 bg-black/95 flex flex-col items-center gap-3">
             <button
               type="button"
               onClick={capturePhoto}
-              className="w-20 h-20 rounded-full border-4 border-white bg-white/20 hover:bg-white/40 transition-colors flex items-center justify-center"
+              className="w-24 h-24 rounded-full border-[6px] border-white bg-red-500 hover:bg-red-600 active:bg-red-700 transition-all flex items-center justify-center shadow-lg shadow-red-500/30"
             >
-              <div className="w-14 h-14 rounded-full bg-white" />
+              <Camera size={36} className="text-white" />
             </button>
+            <span className="text-white font-bold text-lg tracking-wider">TAP TO CAPTURE</span>
           </div>
         </div>
       )}

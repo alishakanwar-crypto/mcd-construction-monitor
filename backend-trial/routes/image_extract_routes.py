@@ -65,7 +65,7 @@ def extract_exif_gps(image_bytes: bytes) -> dict:
 
 async def reverse_geocode(lat: float, lng: float) -> dict:
     """Get address from GPS coordinates using OpenStreetMap Nominatim."""
-    result = {"address": "", "zone": ""}
+    result = {"address": "", "zone": "", "ward": ""}
     try:
         import httpx
 
@@ -76,13 +76,20 @@ async def reverse_geocode(lat: float, lng: float) -> dict:
                 data = resp.json()
                 result["address"] = data.get("display_name", "")
 
-                # Try to detect Delhi zone from address
+                # Extract address parts
                 addr_parts = data.get("address", {})
                 suburb = addr_parts.get("suburb", "").lower()
                 neighbourhood = addr_parts.get("neighbourhood", "").lower()
                 city_district = addr_parts.get("city_district", "").lower()
+                state_district = addr_parts.get("state_district", "").lower()
                 full_addr_lower = result["address"].lower()
 
+                # Extract ward from suburb or neighbourhood
+                ward_name = addr_parts.get("suburb", "") or addr_parts.get("neighbourhood", "") or addr_parts.get("city_district", "")
+                if ward_name:
+                    result["ward"] = ward_name
+
+                # Try to detect Delhi zone from address
                 zone_mapping = {
                     "north": "North Zone",
                     "south": "South Zone",
@@ -96,8 +103,10 @@ async def reverse_geocode(lat: float, lng: float) -> dict:
                     "civil lines": "Civil Lines Zone",
                     "karol bagh": "Karol Bagh Zone",
                 }
+                # Check suburb, neighbourhood, city_district, state_district, and full address
+                search_fields = [suburb, neighbourhood, city_district, state_district, full_addr_lower]
                 for keyword, zone_name in zone_mapping.items():
-                    if keyword in suburb or keyword in neighbourhood or keyword in city_district:
+                    if any(keyword in field for field in search_fields):
                         result["zone"] = zone_name
                         break
 
@@ -145,6 +154,7 @@ async def geocode_coordinates(
     return {
         "address": geo["address"],
         "zone": geo["zone"],
+        "ward": geo.get("ward", ""),
         "latitude": latitude,
         "longitude": longitude,
     }
