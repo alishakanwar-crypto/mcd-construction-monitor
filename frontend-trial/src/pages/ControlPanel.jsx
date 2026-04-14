@@ -5,6 +5,7 @@ import { Monitor, RefreshCw, Maximize2, MapPin, Clock, Filter, Image, Video } fr
 export default function ControlPanel() {
   const [feed, setFeed] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [waking, setWaking] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [filterZone, setFilterZone] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -32,12 +33,14 @@ export default function ControlPanel() {
       if (filterZone) params.zone = filterZone;
       if (filterType) params.media_type = filterType;
       params.limit = 100;
+      setWaking(true);
       const data = await api.getLiveFeed(params);
       setFeed(data.feed || []);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+      setWaking(false);
     }
   };
 
@@ -108,7 +111,10 @@ export default function ControlPanel() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading feed...</div>
+        <div className="text-center py-12 text-gray-500">
+          <RefreshCw size={24} className="mx-auto mb-2 animate-spin text-blue-500" />
+          <p>{waking ? 'Waking up server... (free tier may take 30-60s)' : 'Loading feed...'}</p>
+        </div>
       ) : feed.length === 0 ? (
         <div className={`text-center py-16 ${fullscreen ? 'text-gray-400' : 'text-gray-500'}`}>
           <Monitor size={48} className="mx-auto mb-3 opacity-30" />

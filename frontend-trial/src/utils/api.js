@@ -13,7 +13,7 @@ export function getThumbnailUrl(filePath) {
   return BACKEND_URL + filePath + '/thumbnail';
 }
 
-async function request(endpoint, options = {}) {
+async function request(endpoint, options = {}, retries = 3) {
   const token = localStorage.getItem('token');
   const headers = { ...options.headers };
 
@@ -25,21 +25,39 @@ async function request(endpoint, options = {}) {
     headers['Content-Type'] = 'application/json';
   }
 
-  const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
 
-  if (res.status === 401) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
-    throw new Error('Unauthorized');
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+        throw new Error('Unauthorized');
+      }
+
+      // Render free tier returns 502/503 while waking up — retry
+      if ((res.status === 502 || res.status === 503) && attempt < retries) {
+        await new Promise(r => setTimeout(r, 3000 * (attempt + 1)));
+        continue;
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Request failed' }));
+        throw new Error(err.detail || 'Request failed');
+      }
+
+      return res.json();
+    } catch (err) {
+      if (err.message === 'Unauthorized') throw err;
+      // Network error (Failed to fetch) — retry
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 3000 * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    }
   }
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Request failed' }));
-    throw new Error(err.detail || 'Request failed');
-  }
-
-  return res.json();
 }
 
 export const api = {
