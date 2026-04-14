@@ -79,6 +79,7 @@ class Media(Base):
     capture_time = Column(DateTime, nullable=True)
     file_size = Column(Integer, nullable=True)
     file_data = Column(LargeBinary, nullable=True)  # Store image binary in DB for persistence
+    thumbnail_data = Column(LargeBinary, nullable=True)  # Thumbnail binary (max 300px)
     content_type = Column(String(100), nullable=True)  # MIME type for serving
     created_at = Column(DateTime, default=datetime.utcnow)
 

@@ -7,6 +7,12 @@ export function getMediaUrl(filePath) {
   return BACKEND_URL + filePath;
 }
 
+export function getThumbnailUrl(filePath) {
+  if (!filePath) return '';
+  if (filePath.startsWith('http')) return filePath;
+  return BACKEND_URL + filePath + '/thumbnail';
+}
+
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem('token');
   const headers = { ...options.headers };

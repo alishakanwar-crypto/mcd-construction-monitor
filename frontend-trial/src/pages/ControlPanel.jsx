@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { api, getActivityLabel, getMediaUrl } from '../utils/api';
+import { api, getActivityLabel, getMediaUrl, getThumbnailUrl } from '../utils/api';
 import { Monitor, RefreshCw, Maximize2, MapPin, Clock, Filter, Image, Video } from 'lucide-react';
 
 export default function ControlPanel() {
@@ -125,8 +125,8 @@ export default function ControlPanel() {
               }`}
             >
               {item.media_type === 'image' ? (
-                <img src={getMediaUrl(item.file_path)} alt={item.file_name}
-                  className="w-full h-40 object-cover" />
+                <img src={getThumbnailUrl(item.file_path)} alt={item.file_name}
+                  className="w-full h-40 object-cover" loading="lazy" />
               ) : (
                 <div className="w-full h-40 bg-gray-800 flex items-center justify-center">
                   <Video size={40} className="text-gray-400" />

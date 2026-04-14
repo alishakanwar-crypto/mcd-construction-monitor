@@ -11,6 +11,24 @@ import os
 import uuid
 import math
 import httpx
+import io
+from PIL import Image as PILImage
+
+THUMBNAIL_MAX_SIZE = (300, 300)
+
+
+def generate_thumbnail(image_data: bytes) -> bytes:
+    """Generate a JPEG thumbnail from image binary data."""
+    try:
+        img = PILImage.open(io.BytesIO(image_data))
+        img.thumbnail(THUMBNAIL_MAX_SIZE, PILImage.LANCZOS)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=75, optimize=True)
+        return buf.getvalue()
+    except Exception:
+        return b""
 
 router = APIRouter(prefix="/api/media", tags=["Image & Video Capture"])
 
@@ -175,6 +193,9 @@ async def quick_capture(
         db.refresh(report)
         report_created = True
 
+    # Generate thumbnail for images
+    thumb = generate_thumbnail(contents) if media_type == "image" else b""
+
     # Save media to database
     media = Media(
         report_id=report.id,
@@ -187,6 +208,7 @@ async def quick_capture(
         capture_time=parsed_time or datetime.utcnow(),
         file_size=len(contents),
         file_data=contents,
+        thumbnail_data=thumb or None,
         content_type=content_type,
     )
     db.add(media)
@@ -264,6 +286,9 @@ async def upload_media(
         except (ValueError, AttributeError):
             parsed_time = datetime.utcnow()
 
+    # Generate thumbnail for images
+    thumb = generate_thumbnail(contents) if media_type == "image" else b""
+
     # Store file data in database for persistence across deploys
     media = Media(
         report_id=report_id,
@@ -276,6 +301,7 @@ async def upload_media(
         capture_time=parsed_time or datetime.utcnow(),
         file_size=len(contents),
         file_data=contents,
+        thumbnail_data=thumb or None,
         content_type=content_type,
     )
     db.add(media)
@@ -295,6 +321,39 @@ def serve_media_file(filename: str, db: Session = Depends(get_db)):
         media_type=media.content_type or "application/octet-stream",
         headers={"Cache-Control": "public, max-age=86400"},
     )
+
+
+@router.get("/file/{filename}/thumbnail")
+def serve_thumbnail(filename: str, db: Session = Depends(get_db)):
+    """Serve thumbnail version of an image (max 300px)."""
+    media = db.query(Media).filter(Media.file_path.contains(filename)).first()
+    if not media:
+        raise HTTPException(status_code=404, detail="File not found")
+    if media.thumbnail_data:
+        return Response(
+            content=media.thumbnail_data,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+    # Fallback: generate thumbnail on-the-fly if not stored
+    if media.file_data and media.media_type == "image":
+        thumb = generate_thumbnail(media.file_data)
+        if thumb:
+            media.thumbnail_data = thumb
+            db.commit()
+            return Response(
+                content=thumb,
+                media_type="image/jpeg",
+                headers={"Cache-Control": "public, max-age=86400"},
+            )
+    # Last fallback: serve full image
+    if media.file_data:
+        return Response(
+            content=media.file_data,
+            media_type=media.content_type or "application/octet-stream",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+    raise HTTPException(status_code=404, detail="No image data available")
 
 
 @router.get("/report/{report_id}", response_model=list[MediaResponse])
