@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text, inspect
 from database import engine, Base, SessionLocal
 from models import User, Report, Media
 from auth import get_password_hash
@@ -16,6 +17,23 @@ from datetime import datetime, timedelta
 from PIL import Image as PILImage, ImageDraw, ImageFont
 
 Base.metadata.create_all(bind=engine)
+
+
+def _run_migrations():
+    """Add any new columns that create_all won't add to existing tables."""
+    insp = inspect(engine)
+    if "media" in insp.get_table_names():
+        columns = [c["name"] for c in insp.get_columns("media")]
+        if "thumbnail_data" not in columns:
+            with engine.begin() as conn:
+                dialect = engine.dialect.name
+                if dialect == "postgresql":
+                    conn.execute(text("ALTER TABLE media ADD COLUMN thumbnail_data BYTEA"))
+                else:
+                    conn.execute(text("ALTER TABLE media ADD COLUMN thumbnail_data BLOB"))
+
+
+_run_migrations()
 
 app = FastAPI(
     title="MCD Unauthorized Construction Monitor",
